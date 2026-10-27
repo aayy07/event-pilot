@@ -1,0 +1,15 @@
+Screen with QR(this doesn't need to be part of app)
+
+Registration Page/ Login page(Name and Email BankID/Dept./Dom)
+
+Send Registration link/OTP to email
+
+Login > Event Dashboard
+
+ADMIN
+
+Create Event
+
+Give Details
+
+Generate QR code webpage(show this at event)
