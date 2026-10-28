@@ -1,15 +1,11 @@
-Screen with QR(this doesn't need to be part of app)
+Admin Flow
+1. Admin signs in using deployment-configured credentials.
+2. Admin creates an event and enters its name, date, time, venue, and description.
+3. EventPilot creates a signed registration page URL and QR code.
+4. Admin shares either with participants.
 
-Registration Page/ Login page(Name and Email BankID/Dept./Dom)
-
-Send Registration link/OTP to email
-
-Login > Event Dashboard
-
-ADMIN
-
-Create Event
-
-Give Details
-
-Generate QR code webpage(show this at event)
+Participant Flow
+1. Participant scans the QR code or opens the registration link.
+2. Participant enters their name and email address.
+3. The server validates the email. Addresses ending in @sc.com are approved; other domains are denied.
+4. Approved participants can see the event details.

@@ -1,89 +1,34 @@
-EventPilot — Local Event Management MVP
-EventPilot is a local, Micepad-inspired event operations starter. It is intended to grow into a broader event-management application with organizer tools, attendee registration, onsite check-in, badge printing, and reporting.
-Current status: The Next.js dashboard is a browser-persisted demo UI. The FastAPI API has separate SQLite-backed endpoints for events, attendees, check-in, and event statistics. The frontend is not yet connected to those API endpoints, so changes made in the demo dashboard do not currently persist to the SQLite database.
+# EventPilot
 
-Features in this starter
-Frontend
-- Responsive Next.js / React dashboard.
-- Event overview and sample event data.
-- Attendee listing and search.
-- Demo attendee creation and CSV export.
-- QR credential / check-in interface.
-- Badge preview and browser printing.
-- Attendance metrics and reports.
-- Browser localStorage persistence for demo UI state.
-Backend API
-- FastAPI application with interactive OpenAPI docs.
-- SQLite database using SQLAlchemy's async interface and aiosqlite.
-- Event creation and listing.
-- Attendee creation and listing by event.
-- Duplicate attendee-email check within an event.
-- Check-in by attendee code, including duplicate-check-in response.
-- Event statistics: registered, checked in, awaiting arrival, and attendance rate.
-- CORS configured for the local frontend origin.
-Requirements
-- Windows 10/11 (the included .bat scripts are for Windows)
-- Python 3.11 or newer
-- Node.js 20 or newer
-- Internet connection for the first dependency installation
-- No PostgreSQL installation required. SQLite stores data in a local .db file.
-Start the backend on Windows
-Recommended: use the included script
-From the project root, double-click run-api-windows.bat.
+EventPilot is a Next.js event-registration app. An administrator signs in, creates an event, then shares a signed registration link or its QR code. Participants provide their name and email; only addresses ending in `@sc.com` can view the event details.
 
-The script creates a virtual environment if needed, installs backend/requirements.txt, creates .env from .env.example if needed, and launches Uvicorn. If it detects an old PostgreSQL URL in backend/.env, it replaces it with the SQLite example configuration.
+## Run locally
 
-The database URL defaults to:
-DATABASE_URL=sqlite+aiosqlite:///./eventpilot.db
-CORS_ORIGINS=http://localhost:3000
-Because the backend is started from the backend directory, the database file is created at backend/eventpilot.db.
-Manual PowerShell setup
-Open PowerShell in the project root and run:
-cd .\backend\
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
-Important: use  .\.venv\Scripts\python.exe -m uvicorn ... as shown, rather than plain uvicorn, to ensure Uvicorn uses the project's virtual environment and can import pydantic-settings and the other dependencies.
+Requirements: Node.js 20 or newer.
 
-Open:
-- API documentation: http://127.0.0.1:8000/docs
-- Health check: http://127.0.0.1:8000/health
-If startup fails, confirm backend/.env uses the SQLite URL above and that installation completed successfully.
-Start the frontend on Windows
-From the project root, double-click run-frontend-windows.bat.
+1. Open a terminal in `frontend/` and install dependencies with `npm install`.
+2. Copy `frontend/.env.example` to `frontend/.env.local`.
+3. Set `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and a private random `APP_SECRET` of at least 32 characters.
+4. Run `npm run dev` from `frontend/` and open [http://localhost:3000](http://localhost:3000).
 
-Or run manually:
-cd .\frontend\
-npm install
-npm run dev
-Open http://localhost:3000.
+The root `run-frontend-windows.bat` script starts the frontend on Windows. The old FastAPI backend is no longer used.
 
-The frontend can currently be explored without the backend. Its demo data is stored in browser localStorage; this is separate from backend/eventpilot.db until API integration is implemented.
-API endpoint summary
-Method	Endpoint	Purpose
-GET	/health	API health status
-GET	/api/events	List events
-POST	/api/events	Create an event
-GET	/api/events/{event_id}	Retrieve an event
-GET	/api/events/{event_id}/attendees	List attendees; optional q search
-POST	/api/events/{event_id}/attendees	Add an attendee
-POST	/api/events/{event_id}/check-in/{code}	Check in an attendee by code
-GET	/api/events/{event_id}/stats	Event attendance statistics
+## Deploy to Vercel
 
+1. Import the repository into Vercel and set **Root Directory** to `frontend`.
+2. Add these environment variables for the deployment:
+   - `ADMIN_EMAIL`: administrator sign-in email.
+   - `ADMIN_PASSWORD`: a strong administrator password.
+   - `APP_SECRET`: a private random secret of at least 32 characters. Keep it stable; changing it invalidates existing registration links and admin sessions.
+3. Deploy with the default Next.js build settings.
 
-Use /docs to inspect request schemas and try the endpoints interactively.
-Data and safety notes
-- The SQLite database is a local development database and should be backed up if its data matters.
-- Do not use real attendee personal data in this demo build.
-- This starter does not yet implement production authentication, organization-level tenant isolation, payment processing, email delivery, full offline synchronization, or a robust printer-specific integration.
-- The API currently creates database tables at startup. A production deployment should use schema migrations such as Alembic.
-- Do not commit .env, .venv, or the generated .db file to a public repository.
-Next development steps
-1. Connect dashboard data loading and mutations to the FastAPI API.
-2. Add authentication and organization/event role-based access control.
-3. Add CSV attendee import and robust validation.
-4. Add attendance history and session-level attendance.
-5. Build a proper offline-first check-in PWA with queued sync and conflict handling.
-6. Add configurable registration forms, email notifications, and ticketing.
-See [`changes.md`](./changes.md) for the project change log and current implementation status.
+Do not commit `.env.local` or share `APP_SECRET`.
+
+## App flow
+
+- **Admin:** Sign in with the configured credentials, create an event with its title, date, time, venue, and description, then copy its registration URL or QR.
+- **Participant:** Open the link or scan the QR, enter their name and email, and pass the server-side `@sc.com` check to see the event details. Other email domains are denied.
+
+## MVP storage limits
+
+This version uses Next.js route handlers and does not require the Python backend. Event records are kept in the administrator's browser `localStorage`; a signed registration URL carries the event details so participants can open it on another device. Clearing that browser or using another admin browser loses the event list. Participant submissions are validated but are not stored or emailed. Add a persistent database and an email provider before using this for real attendee management or invitations.

@@ -1,59 +1,274 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
-import { Activity, ArrowDownRight, ArrowUpRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Clock3, Download, FileBarChart, Filter, LayoutDashboard, LogOut, Mail, Menu, MoreHorizontal, Plus, Printer, QrCode, Search, Settings, ShieldCheck, Sparkles, Ticket, UserCheck, Users, X, Zap } from 'lucide-react';
-import { Attendee, EventInfo, seedAttendees, seedEvents } from '../lib/data';
-type Page = 'Overview'|'Attendees'|'Check-in'|'Reports'|'Settings';
-const nav: {name:Page;icon:any}[] = [{name:'Overview',icon:LayoutDashboard},{name:'Attendees',icon:Users},{name:'Check-in',icon:QrCode},{name:'Reports',icon:FileBarChart},{name:'Settings',icon:Settings}];
-const initials=(s:string)=>s.split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
-const colors=['#e8e7ff','#dff4eb','#ffe8d9','#e0efff','#ffe1e8'];
-export default function Home(){
- const [page,setPage]=useState<Page>('Overview'); const [events,setEvents]=useState<EventInfo[]>(seedEvents); const [eventId,setEventId]=useState('evt-001'); const [attendees,setAttendees]=useState<Attendee[]>(seedAttendees); const [loaded,setLoaded]=useState(false); const [search,setSearch]=useState(''); const [filter,setFilter]=useState('All attendees'); const [modal,setModal]=useState<'attendee'|'event'|'badge'|null>(null); const [selected,setSelected]=useState<Attendee|null>(null); const [notice,setNotice]=useState(''); const [mobileNav,setMobileNav]=useState(false); const [name,setName]=useState(''); const [email,setEmail]=useState(''); const [company,setCompany]=useState(''); const [ticket,setTicket]=useState('General'); const [scanCode,setScanCode]=useState(''); const [eventName,setEventName]=useState(''); const [eventDate,setEventDate]=useState('2027-01-15'); const [eventVenue,setEventVenue]=useState(''); const [isAuthenticated,setIsAuthenticated]=useState(false); const [loginEmail,setLoginEmail]=useState('alex@northstar.events'); const [loginPassword,setLoginPassword]=useState(''); const [loginError,setLoginError]=useState(''); const scanRef=useRef<HTMLInputElement>(null);
- useEffect(()=>{try{const e=localStorage.getItem('ep-events');const a=localStorage.getItem('ep-attendees');if(e)setEvents(JSON.parse(e));if(a)setAttendees(JSON.parse(a));}catch{}setLoaded(true)},[]);
- useEffect(()=>{if(loaded){localStorage.setItem('ep-events',JSON.stringify(events));localStorage.setItem('ep-attendees',JSON.stringify(attendees));}},[events,attendees,loaded]);
- useEffect(()=>{if(notice){const t=setTimeout(()=>setNotice(''),2800);return()=>clearTimeout(t)}},[notice]);
- const activeEvent=events.find(e=>e.id===eventId)||events[0]; const eventAttendees=attendees; const checked=eventAttendees.filter(a=>a.status==='Checked in').length; const registered=eventAttendees.length; const rate=registered?Math.round(checked/registered*100):0;
- const filtered=useMemo(()=>attendees.filter(a=>(a.name+' '+a.email+' '+a.company+' '+a.code).toLowerCase().includes(search.toLowerCase())&&(filter==='All attendees'||a.status===filter)),[attendees,search,filter]);
- const changePage=(p:Page)=>{setPage(p);setMobileNav(false)};
- const addAttendee=(e:React.FormEvent)=>{e.preventDefault();if(!name.trim()||!email.trim())return;const a:Attendee={id:'att-'+Date.now(),name:name.trim(),email:email.trim(),company:company.trim()||'—',ticket, status:'Registered',code:'EP-'+Math.random().toString(36).slice(2,8).toUpperCase()};setAttendees(prev=>[a,...prev]);setName('');setEmail('');setCompany('');setTicket('General');setModal(null);setNotice('Attendee added successfully');};
- const addEvent=(e:React.FormEvent)=>{e.preventDefault();if(!eventName.trim())return;const ev:EventInfo={id:'evt-'+Date.now(),name:eventName,date:eventDate,venue:eventVenue||'Venue to be confirmed',status:'Draft',capacity:200};setEvents(prev=>[ev,...prev]);setEventId(ev.id);setEventName('');setEventVenue('');setModal(null);setNotice('Event workspace created');};
- const checkIn=(a:Attendee)=>{if(a.status==='Checked in'){setNotice(`${a.name} is already checked in`);return}setAttendees(prev=>prev.map(x=>x.id===a.id?{...x,status:'Checked in',checkedInAt:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}:x));setSelected({...a,status:'Checked in'});setNotice(`${a.name} checked in successfully`)};
- const doScan=(e:React.FormEvent)=>{e.preventDefault();const found=attendees.find(a=>a.code.toLowerCase()===scanCode.trim().toLowerCase()||a.id.toLowerCase()===scanCode.trim().toLowerCase());if(!found){setNotice('No attendee found. Check the code or search by name.');return}if(found.status==='Checked in'){setSelected(found);setNotice(`${found.name} has already checked in`)}else checkIn(found);setScanCode('');};
- const exportCsv=()=>{const rows=[['Name','Email','Company','Ticket','Status','Code'],...attendees.map(a=>[a.name,a.email,a.company,a.ticket,a.status,a.code])];const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const l=document.createElement('a');l.href=url;l.download='eventpilot-attendees.csv';l.click();URL.revokeObjectURL(url);setNotice('CSV export downloaded')};
- const handleLogin=(e:React.FormEvent)=>{e.preventDefault();if(!loginEmail.trim()||!loginPassword.trim()){setLoginError('Enter your email and password to continue.');return;}if(!loginEmail.includes('@')||loginPassword.length<4){setLoginError('Use a valid email and a password with at least 4 characters.');return;}setLoginError('');setIsAuthenticated(true);};
- if(!isAuthenticated){return <div style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:'24px',background:'linear-gradient(135deg,#f5f3ff 0%,#eef6ff 100%)'}}><div style={{width:'100%',maxWidth:'440px',background:'#fff',border:'1px solid #ececf4',borderRadius:'24px',padding:'32px 28px',boxShadow:'0 24px 60px rgba(81,66,212,.12)'}}><div style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'48px',height:'48px',background:'linear-gradient(140deg,#7969f5,#5545d6)',color:'#fff',borderRadius:'16px',fontWeight:800,marginBottom:'18px'}}>EP</div><div style={{color:'#6859e8',fontSize:'12px',letterSpacing:'1.5px',fontWeight:700,textTransform:'uppercase',marginBottom:'8px'}}>EventPilot</div><h1 style={{margin:'0 0 8px',fontSize:'32px',lineHeight:1.1,color:'#20223a'}}>Welcome back</h1><p style={{margin:'0 0 24px',color:'#6b6d84',fontSize:'15px'}}>Sign in to manage your events, attendees, and check-ins.</p><form onSubmit={handleLogin} style={{display:'grid',gap:'14px'}}><label style={{display:'grid',gap:'8px',fontWeight:600,color:'#30314f'}}><span>Email</span><input value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} type="email" placeholder="alex@northstar.events" style={{padding:'12px 14px',borderRadius:'12px',border:'1px solid #e5e7ef',outline:'none',fontSize:'14px'}} /></label><label style={{display:'grid',gap:'8px',fontWeight:600,color:'#30314f'}}><span>Password</span><input value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} type="password" placeholder="Enter password" style={{padding:'12px 14px',borderRadius:'12px',border:'1px solid #e5e7ef',outline:'none',fontSize:'14px'}} /></label>{loginError&&<div style={{padding:'10px 12px',borderRadius:'10px',background:'#fff1f3',border:'1px solid #ffd1da',color:'#b32945',fontSize:'13px'}}>{loginError}</div>}<button type="submit" style={{marginTop:'8px',padding:'14px 18px',border:'none',borderRadius:'12px',background:'linear-gradient(135deg,#6859e8,#5142d4)',color:'#fff',fontWeight:700,fontSize:'15px',cursor:'pointer'}}>Sign in</button></form><div style={{marginTop:'18px',paddingTop:'18px',borderTop:'1px solid #eef0f6',color:'#7a7d8f',fontSize:'12px',lineHeight:1.6}}>Demo access: any valid email plus a password with at least 4 characters.</div></div></div>}
- return <div className="app-shell">
-  <aside className={`sidebar ${mobileNav?'sidebar-open':''}`}><div className="brand"><div className="brand-mark"><Sparkles size={20}/></div><div><strong>eventpilot</strong><span>EVENT OPERATIONS</span></div><button className="icon-button close-mobile" onClick={()=>setMobileNav(false)}><X size={18}/></button></div>
-   <button className="workspace-switch"><div className="workspace-avatar">N</div><div className="workspace-copy"><strong>Northstar Events</strong><span>Free workspace</span></div><ChevronDown size={16}/></button>
-   <div className="side-label">WORKSPACE</div><nav className="nav-list">{nav.map(n=><button key={n.name} onClick={()=>changePage(n.name)} className={`nav-item ${page===n.name?'active':''}`}><n.icon size={18}/><span>{n.name}</span>{n.name==='Attendees'&&<small>{attendees.length}</small>}</button>)}</nav>
-   <div className="side-label events-label">YOUR EVENTS <button className="tiny-icon" onClick={()=>setModal('event')}><Plus size={14}/></button></div><div className="event-shortcuts">{events.slice(0,4).map((ev,i)=><button key={ev.id} onClick={()=>{setEventId(ev.id);changePage('Overview')}} className={`event-shortcut ${eventId===ev.id?'event-current':''}`}><span className={`event-dot dot-${i%4}`}/><span>{ev.name}</span></button>)}</div>
-   <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={18}/></div><strong>Need a hand?</strong><p>Check our quick-start guide to get your event ready.</p><button onClick={()=>setNotice('Quick-start guide: create an event, add attendees, then test check-in.')}>View getting started <ChevronRight size={14}/></button></div><button className="profile-row"><div className="profile-avatar">AC</div><div className="profile-copy"><strong>Alex Carter</strong><span>Event administrator</span></div><MoreHorizontal size={18}/></button></div>
-  </aside>
-  {mobileNav&&<button className="mobile-overlay" onClick={()=>setMobileNav(false)} aria-label="Close navigation"/>}
-  <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={()=>setMobileNav(true)}><Menu size={20}/></button><span className="breadcrumb-muted">Workspace</span><ChevronRight size={15}/><span className="breadcrumb-current">{page}</span></div><div className="topbar-right"><div className="live-pill"><span/> All systems operational</div><button className="icon-button notification-button" onClick={()=>setNotice('You’re all caught up.')}><Bell size={18}/><i/></button><div className="top-avatar">AC</div></div></header>
-  <div className="content-wrap">
-   <div className="event-toolbar"><div className="event-selector-wrap"><div className="event-mini-icon"><CalendarDays size={17}/></div><select value={eventId} onChange={e=>setEventId(e.target.value)} aria-label="Select event">{events.map(ev=><option key={ev.id} value={ev.id}>{ev.name}</option>)}</select><ChevronDown size={15}/></div><div className="toolbar-actions"><span className={`status-pill ${activeEvent.status==='Upcoming'?'status-upcoming':activeEvent.status==='Completed'?'status-completed':'status-draft'}`}><span/>{activeEvent.status}</span><button className="btn btn-secondary" onClick={()=>setNotice('Event preview is ready to connect to the public event page.')}><Zap size={15}/> Preview event</button><button className="btn btn-primary" onClick={()=>setModal('event')}><Plus size={16}/> New event</button></div></div>
-   {page==='Overview'&&<><div className="page-heading"><div><div className="eyebrow">TUESDAY, OCTOBER 27, 2026 <span>•</span> EVENT OVERVIEW</div><h1>Good morning, Alex <span className="wave">✳</span></h1><p>Here’s what’s happening with your events today.</p></div><button className="btn btn-secondary" onClick={exportCsv}><Download size={16}/> Export report</button></div>
-    <div className="hero-card"><div className="hero-copy"><div className="hero-eyebrow"><span className="hero-live-dot"/> NEXT UP</div><h2>{activeEvent.name}</h2><p><CalendarDays size={15}/>{new Date(activeEvent.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}<span className="hero-separator">·</span><span>{activeEvent.venue}</span></p><div className="hero-actions"><button className="btn btn-white" onClick={()=>changePage('Attendees')}>Manage attendees <ChevronRight size={15}/></button><button className="hero-text-button" onClick={()=>changePage('Check-in')}>Open check-in <ArrowUpRight size={16}/></button></div></div><div className="hero-art"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="hero-calendar"><CalendarDays size={27}/><strong>{new Date(activeEvent.date+'T12:00:00').getDate()}</strong><span>{new Date(activeEvent.date+'T12:00:00').toLocaleDateString('en-US',{month:'short'}).toUpperCase()}</span></div><div className="floating-tag tag-top"><CheckCircle2 size={14}/> Registration live</div><div className="floating-tag tag-bottom"><Users size={14}/> {registered} attendees</div></div></div>
-    <div className="section-title-row"><div><h3>Event at a glance</h3><p>Your key numbers, all in one place.</p></div><button className="subtle-link" onClick={()=>changePage('Reports')}>View analytics <ArrowUpRight size={15}/></button></div>
-    <div className="stats-grid"><Stat icon={<Users size={18}/>} label="Total registrations" value={registered.toLocaleString()} trend="12.8%" note="vs. previous event" color="violet"/><Stat icon={<UserCheck size={18}/>} label="Checked in" value={checked.toLocaleString()} trend={`${rate}%`} note="of all attendees" color="green"/><Stat icon={<Ticket size={18}/>} label="Available capacity" value={Math.max(0,activeEvent.capacity-registered).toLocaleString()} trend={`${activeEvent.capacity} total`} note="event capacity" color="orange"/><Stat icon={<Activity size={18}/>} label="Check-in progress" value={`${rate}%`} trend={checked?'Live':'Not started'} note="attendance rate" color="blue"/></div>
-    <div className="dashboard-grid"><section className="panel activity-panel"><div className="panel-header"><div><h3>Recent attendees</h3><p>Latest registrations and check-ins</p></div><button className="subtle-link" onClick={()=>changePage('Attendees')}>View all <ChevronRight size={15}/></button></div><AttendeeTable attendees={attendees.slice(0,5)} onSelect={a=>{setSelected(a);setModal('badge')}} compact/></section><section className="panel progress-panel"><div className="panel-header"><div><h3>Attendance overview</h3><p>Registration to check-in</p></div><button className="icon-button" onClick={()=>changePage('Reports')}><MoreHorizontal size={18}/></button></div><div className="donut-wrap"><div className="donut" style={{background:`conic-gradient(#6758e8 ${rate}%, #eeeefa 0)`}}><div className="donut-inner"><strong>{rate}%</strong><span>checked in</span></div></div></div><div className="progress-legend"><div><span className="legend-dot violet-dot"/>Checked in <strong>{checked}</strong></div><div><span className="legend-dot pale-dot"/>Awaiting arrival <strong>{registered-checked}</strong></div></div><div className="capacity-note"><div className="capacity-icon"><ShieldCheck size={17}/></div><div><strong>{Math.max(0,activeEvent.capacity-registered)} spots remaining</strong><span>Capacity is {activeEvent.capacity} attendees</span></div></div></section></div>
-    <div className="bottom-grid"><section className="panel quick-panel"><div className="panel-header"><div><h3>Quick actions</h3><p>Common tasks for your event</p></div></div><div className="quick-actions"><QuickAction icon={<UserCheck size={18}/>} title="Add attendee" desc="Register someone manually" onClick={()=>setModal('attendee')}/><QuickAction icon={<QrCode size={18}/>} title="Start check-in" desc="Scan or find a guest" onClick={()=>changePage('Check-in')}/><QuickAction icon={<Printer size={18}/>} title="Print badges" desc="Preview attendee badges" onClick={()=>{setSelected(attendees[0]||null);setModal('badge')}}/><QuickAction icon={<FileBarChart size={18}/>} title="View reports" desc="Explore attendance data" onClick={()=>changePage('Reports')}/></div></section><section className="panel setup-panel"><div className="panel-header"><div><h3>Event readiness</h3><p>A few things to check before doors open</p></div><span className="readiness-count">3/4</span></div><div className="setup-list"><div className="setup-item done"><span><Check size={13}/></span><div><strong>Event details added</strong><small>Your date and venue are set</small></div><CheckCircle2 size={17}/></div><div className="setup-item done"><span><Check size={13}/></span><div><strong>Attendees imported</strong><small>{registered} attendees in your list</small></div><CheckCircle2 size={17}/></div><div className="setup-item done"><span><Check size={13}/></span><div><strong>Check-in ready</strong><small>Scanner is available to test</small></div><CheckCircle2 size={17}/></div><button className="setup-item" onClick={()=>setNotice('Next: configure your badge template in the badge printing workflow.')}><span className="empty-check"/><div><strong>Configure badge design</strong><small>Customize the attendee badge</small></div><ChevronRight size={17}/></button></div></section></div>
-   </>}
-   {page==='Attendees'&&<><div className="page-heading"><div><div className="eyebrow">EVENT MANAGEMENT</div><h1>Attendees</h1><p>Manage registrations, guest details and attendance.</p></div><div className="heading-actions"><button className="btn btn-secondary" onClick={exportCsv}><Download size={16}/> Export CSV</button><button className="btn btn-primary" onClick={()=>setModal('attendee')}><Plus size={16}/> Add attendee</button></div></div><div className="stats-grid compact-stats"><Stat icon={<Users size={18}/>} label="All attendees" value={registered.toString()} note="in this event" color="violet"/><Stat icon={<CheckCircle2 size={18}/>} label="Checked in" value={checked.toString()} note="arrived at venue" color="green"/><Stat icon={<Clock3 size={18}/>} label="Expected" value={(registered-checked).toString()} note="not checked in yet" color="orange"/><Stat icon={<Ticket size={18}/>} label="VIP & speakers" value={attendees.filter(a=>a.ticket!=='General').length.toString()} note="special ticket types" color="blue"/></div><section className="panel full-table-panel"><div className="table-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, email or company..."/></div><div className="filter-actions"><div className="select-wrap"><Filter size={15}/><select value={filter} onChange={e=>setFilter(e.target.value)}><option>All attendees</option><option>Registered</option><option>Checked in</option></select><ChevronDown size={14}/></div><button className="icon-button bordered-icon" onClick={exportCsv} title="Export"><Download size={17}/></button></div></div><AttendeeTable attendees={filtered} onSelect={a=>{setSelected(a);setModal('badge')}} onCheckIn={checkIn}/><div className="table-footer"><span>Showing <strong>{filtered.length}</strong> of <strong>{attendees.length}</strong> attendees</span><div className="pagination"><button disabled><ChevronLeft size={16}/></button><button className="page-current">1</button><button disabled><ChevronRight size={16}/></button></div></div></section></>}
-   {page==='Check-in'&&<><div className="page-heading"><div><div className="eyebrow">EVENT DAY OPERATIONS</div><h1>Guest check-in</h1><p>Welcome attendees and keep your event moving.</p></div><span className="scanner-online"><span/> Scanner ready</span></div><div className="checkin-layout"><section className="panel scanner-panel"><div className="scanner-heading"><div className="scanner-symbol"><QrCode size={24}/></div><div><h3>Scan attendee QR code</h3><p>Enter a demo code or use attendee lookup.</p></div></div><form className="scan-form" onSubmit={doScan}><label htmlFor="scan-code">QR code or attendee ID</label><div className="scan-input-row"><div className="scan-input"><QrCode size={18}/><input ref={scanRef} id="scan-code" value={scanCode} onChange={e=>setScanCode(e.target.value)} placeholder="e.g. EP-8B4D19" autoComplete="off"/></div><button className="btn btn-primary" type="submit">Find guest</button></div><span className="field-hint">Try Priya's code: EP-8B4D19</span></form><div className="scanner-divider"><span/> OR LOOK UP ATTENDEE <span/></div><div className="search-box lookup-search"><Search size={17}/><input value={search} onChange={setSearch} placeholder="Search by name or company..."/></div><div className="lookup-list">{attendees.filter(a=>(a.name+' '+a.company+' '+a.email).toLowerCase().includes(search.toLowerCase())).slice(0,5).map(a=><div className="lookup-row" key={a.id}><Avatar name={a.name}/><div className="lookup-person"><strong>{a.name}</strong><span>{a.company} · {a.ticket}</span></div>{a.status==='Checked in'?<span className="status-pill status-checked">Checked in</span>:<button className="btn btn-small btn-primary" onClick={()=>checkIn(a)}>Check in</button>}</div>)}</div></section><aside className="checkin-side"><section className="panel checkin-totals"><div className="panel-header"><div><h3>Live attendance</h3><p>Updates as guests arrive</p></div><span className="pulse-dot"/></div><div className="big-counter"><strong>{checked}</strong><span>/ {registered}</span></div><p className="counter-caption">attendees checked in</p><div className="linear-progress"><span style={{width:`${rate}%`}}/></div><div className="counter-meta"><span>{rate}% complete</span><span>{registered-checked} expected</span></div><div className="counter-separator"/><div className="mini-stat-row"><span><span className="legend-dot green-dot"/>Arrived</span><strong>{checked}</strong></div><div className="mini-stat-row"><span><span className="legend-dot pale-dot"/>Not arrived</span><strong>{registered-checked}</strong></div></section><section className="panel recent-checkins"><div className="panel-header"><div><h3>Recent check-ins</h3><p>Latest arrivals</p></div><Activity size={17} className="muted-icon"/></div>{attendees.filter(a=>a.status==='Checked in').slice(0,4).map(a=><div className="recent-row" key={a.id}><Avatar name={a.name}/><div className="lookup-person"><strong>{a.name}</strong><span>{a.checkedInAt||'Just now'}</span></div><CheckCircle2 size={17} className="check-green"/></div>)}{checked===0&&<p className="empty-note">No check-ins yet. Your first guest will appear here.</p>}</section></aside></div></>}
-   {page==='Reports'&&<><div className="page-heading"><div><div className="eyebrow">EVENT INSIGHTS</div><h1>Reports & analytics</h1><p>Understand registration and attendance at a glance.</p></div><button className="btn btn-primary" onClick={exportCsv}><Download size={16}/> Export attendee data</button></div><div className="stats-grid"><Stat icon={<Users size={18}/>} label="Registrations" value={registered.toString()} trend="Live" note="current attendee list" color="violet"/><Stat icon={<UserCheck size={18}/>} label="Attendance" value={`${rate}%`} trend={`${checked} guests`} note="checked in so far" color="green"/><Stat icon={<Clock3 size={18}/>} label="No-shows / pending" value={(registered-checked).toString()} note="not checked in" color="orange"/><Stat icon={<Ticket size={18}/>} label="Capacity used" value={`${Math.round(registered/Math.max(1,activeEvent.capacity)*100)}%`} note={`of ${activeEvent.capacity} spots`} color="blue"/></div><div className="reports-grid"><section className="panel chart-panel"><div className="panel-header"><div><h3>Attendance breakdown</h3><p>Registration status distribution</p></div><span className="report-tag">Current event</span></div><div className="bar-chart"><div className="chart-y-labels"><span>{registered}</span><span>{Math.round(registered*.75)}</span><span>{Math.round(registered*.5)}</span><span>{Math.round(registered*.25)}</span><span>0</span></div><div className="chart-bars"><div className="chart-grid-lines"><i/><i/><i/><i/><i/></div><div className="bar-column"><div className="bar bar-purple" style={{height:`${Math.max(5,registered/Math.max(1,registered)*100)}%`}}/><span>Registered</span><strong>{registered}</strong></div><div className="bar-column"><div className="bar bar-green" style={{height:`${Math.max(5,checked/Math.max(1,registered)*100)}%`}}/><span>Checked in</span><strong>{checked}</strong></div><div className="bar-column"><div className="bar bar-orange" style={{height:`${Math.max(5,(registered-checked)/Math.max(1,registered)*100)}%`}}/><span>Expected</span><strong>{registered-checked}</strong></div></div></div></section><section className="panel report-summary"><div className="panel-header"><div><h3>At a glance</h3><p>Key event metrics</p></div><FileBarChart size={18} className="muted-icon"/></div><div className="summary-metric"><span>Event capacity</span><strong>{activeEvent.capacity}</strong></div><div className="summary-metric"><span>Capacity remaining</span><strong>{Math.max(0,activeEvent.capacity-registered)}</strong></div><div className="summary-metric"><span>General tickets</span><strong>{attendees.filter(a=>a.ticket==='General').length}</strong></div><div className="summary-metric"><span>VIP & speaker tickets</span><strong>{attendees.filter(a=>a.ticket!=='General').length}</strong></div><button className="btn btn-secondary report-export" onClick={exportCsv}><Download size={15}/> Download full CSV</button></section></div><section className="panel report-table"><div className="panel-header"><div><h3>Attendee report</h3><p>Detailed status for every attendee</p></div><button className="subtle-link" onClick={exportCsv}>Export data <ArrowUpRight size={15}/></button></div><AttendeeTable attendees={attendees} onSelect={a=>{setSelected(a);setModal('badge')}} compact/></section></>}
-   {page==='Settings'&&<><div className="page-heading"><div><div className="eyebrow">WORKSPACE PREFERENCES</div><h1>Settings</h1><p>Manage event details and your workspace preferences.</p></div></div><div className="settings-grid"><section className="panel settings-card"><div className="settings-icon"><CalendarDays size={20}/></div><h3>Event details</h3><p>Manage the name, date, venue and capacity for the selected event.</p><div className="setting-line"><span>Event name</span><strong>{activeEvent.name}</strong></div><div className="setting-line"><span>Date</span><strong>{activeEvent.date}</strong></div><div className="setting-line"><span>Venue</span><strong>{activeEvent.venue}</strong></div><div className="setting-line"><span>Capacity</span><strong>{activeEvent.capacity}</strong></div><button className="btn btn-secondary setting-button" onClick={()=>{setEventName(activeEvent.name);setEventDate(activeEvent.date);setEventVenue(activeEvent.venue);setNotice('Editing event settings is on the next build list. Use New event to create another workspace.')}}>Review event settings</button></section><section className="panel settings-card"><div className="settings-icon green-bg"><ShieldCheck size={20}/></div><h3>Team & permissions</h3><p>Keep your event team organized with clear access boundaries.</p><div className="team-member"><div className="profile-avatar">AC</div><div className="lookup-person"><strong>Alex Carter</strong><span>alex@northstar.events</span></div><span className="role-pill">Admin</span></div><div className="team-member"><div className="member-avatar purple-bg">JD</div><div className="lookup-person"><strong>Jordan Davis</strong><span>Check-in staff</span></div><span className="role-pill">Staff</span></div><button className="btn btn-secondary setting-button" onClick={()=>setNotice('Team invitations will be available when authentication is connected.')}>Invite team member <Plus size={15}/></button></section><section className="panel settings-card"><div className="settings-icon orange-bg"><Printer size={20}/></div><h3>Badge & check-in</h3><p>Prepare the onsite experience before your event starts.</p><div className="setting-line"><span>Badge printing</span><span className="setting-enabled">Available</span></div><div className="setting-line"><span>QR validation</span><span className="setting-enabled">Enabled</span></div><div className="setting-line"><span>Offline mode</span><span className="setting-pending">Planned</span></div><button className="btn btn-secondary setting-button" onClick={()=>{setSelected(attendees[0]||null);setModal('badge')}}>Preview badge <ArrowUpRight size={15}/></button></section><section className="panel settings-card"><div className="settings-icon blue-bg"><Download size={20}/></div><h3>Data & exports</h3><p>Download a copy of your attendee records for analysis.</p><div className="setting-line"><span>Attendee records</span><strong>{attendees.length}</strong></div><div className="setting-line"><span>Storage</span><strong>This browser</strong></div><button className="btn btn-secondary setting-button" onClick={exportCsv}>Export attendee CSV <Download size={15}/></button></section></div></>}
-  </div><footer className="footer"><span>© 2026 EventPilot</span><span>Built for smoother event days <Sparkles size={13}/></span><button onClick={()=>setNotice('EventPilot local MVP · Demo data is stored in this browser.')}>About this demo</button></footer></main>
-  {notice&&<div className="toast"><CheckCircle2 size={18}/><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
-  {modal&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(null)}}><div className="modal-card"><div className="modal-header"><div><div className="eyebrow">EVENTPILOT WORKSPACE</div><h2>{modal==='attendee'?'Add an attendee':modal==='event'?'Create a new event':'Attendee badge preview'}</h2></div><button className="icon-button" onClick={()=>setModal(null)}><X size={19}/></button></div>
-   {modal==='attendee'&&<form className="modal-form" onSubmit={addAttendee}><label>Full name<input required value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Sam Taylor"/></label><label>Email address<input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="sam@company.com"/></label><label>Company<input value={company} onChange={e=>setCompany(e.target.value)} placeholder="Company or organization"/></label><label>Ticket type<select value={ticket} onChange={e=>setTicket(e.target.value)}><option>General</option><option>VIP</option><option>Speaker</option><option>Exhibitor</option></select></label><div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={()=>setModal(null)}>Cancel</button><button type="submit" className="btn btn-primary"><Plus size={15}/> Add attendee</button></div></form>}
-   {modal==='event'&&<form className="modal-form" onSubmit={addEvent}><label>Event name<input required value={eventName} onChange={e=>setEventName(e.target.value)} placeholder="e.g. Annual Product Summit"/></label><label>Event date<input required type="date" value={eventDate} onChange={e=>setEventDate(e.target.value)}/></label><label>Venue<input value={eventVenue} onChange={e=>setEventVenue(e.target.value)} placeholder="Venue or online"/></label><div className="modal-note"><Sparkles size={16}/> A new draft event will be added to your workspace.</div><div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={()=>setModal(null)}>Cancel</button><button type="submit" className="btn btn-primary"><Plus size={15}/> Create event</button></div></form>}
-   {modal==='badge'&&<div className="badge-modal-body">{selected?<><div className="print-badge"><div className="badge-brand"><Sparkles size={15}/> EVENTPILOT</div><div className="badge-event">{activeEvent.name}</div><div className="badge-avatar">{initials(selected.name)}</div><h3>{selected.name}</h3><p>{selected.company}</p><span className="badge-ticket">{selected.ticket.toUpperCase()}</span><div className="badge-qr"><QRCodeSVG value={selected.code} size={92}/></div><span className="badge-code">{selected.code}</span></div><p className="badge-help">Print preview uses a sample badge layout. Hardware-specific printer support can be added next.</p><div className="modal-actions"><button className="btn btn-secondary" onClick={()=>setModal(null)}>Close</button><button className="btn btn-primary" onClick={()=>window.print()}><Printer size={15}/> Print badge</button></div></>:<p>No attendees available yet. Add an attendee first.</p>}</div>}
-  </div></div>}
- </div>
+
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { CalendarDays, Check, ChevronRight, Copy, ExternalLink, LogOut, MapPin, Plus, QrCode, ShieldCheck, Sparkles, Ticket, Users } from 'lucide-react';
+import type { EventDetails } from '../lib/security';
+
+type SavedEvent = EventDetails & { registrationUrl: string };
+type EventDraft = Omit<EventDetails, 'id'>;
+
+const emptyDraft: EventDraft = { name: '', date: '', startTime: '', venue: '', description: '' };
+const storageKey = 'eventpilot-events-v2';
+
+export default function Home() {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [events, setEvents] = useState<SavedEvent[]>([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [draft, setDraft] = useState<EventDraft>(emptyDraft);
+  const [showForm, setShowForm] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [copying, setCopying] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/session')
+      .then(async (response) => {
+        if (!response.ok) return;
+        const session = await response.json();
+        setAdminEmail(session.email ?? '');
+        setAuthenticated(true);
+        try {
+          const saved = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as SavedEvent[];
+          setEvents(saved);
+          setSelectedId(saved[0]?.id ?? '');
+        } catch {
+          localStorage.removeItem(storageKey);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => setCheckingSession(false));
+  }, []);
+
+  const selectedEvent = useMemo(() => events.find((event) => event.id === selectedId) ?? null, [events, selectedId]);
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoginError('');
+    const response = await fetch('/api/admin/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: adminEmail, password }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setLoginError(result.error ?? 'Unable to sign in.');
+      return;
+    }
+    setAdminEmail(result.email);
+    setPassword('');
+    setAuthenticated(true);
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as SavedEvent[];
+      setEvents(saved);
+      setSelectedId(saved[0]?.id ?? '');
+    } catch {
+      localStorage.removeItem(storageKey);
+    }
+  }
+
+  async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError('');
+    const details: EventDetails = { ...draft, id: crypto.randomUUID() };
+    const response = await fetch('/api/events/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(details),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setFormError(result.error ?? 'Could not create a registration link.');
+      return;
+    }
+    const created: SavedEvent = { ...details, registrationUrl: `${window.location.origin}/register/${result.token}` };
+    const updated = [created, ...events];
+    setEvents(updated);
+    setSelectedId(created.id);
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    setDraft(emptyDraft);
+    setShowForm(false);
+    setNotice('Event created. Your registration link and QR are ready.');
+  }
+
+  async function handleLogout() {
+    await fetch('/api/admin/session', { method: 'DELETE' });
+    setAuthenticated(false);
+    setEvents([]);
+    setSelectedId('');
+  }
+
+  async function copyLink() {
+    if (!selectedEvent) return;
+    try {
+      await navigator.clipboard.writeText(selectedEvent.registrationUrl);
+      setCopying(true);
+      setNotice('Registration link copied.');
+      window.setTimeout(() => setCopying(false), 1600);
+    } catch {
+      setNotice('Clipboard access is unavailable on this browser.');
+    }
+  }
+
+  async function copyShareDetails() {
+    if (!selectedEvent) return;
+
+    const registrationUrl = selectedEvent.registrationUrl;
+    const qrCanvas = document.querySelector('.qr-export-source canvas') as HTMLCanvasElement | null;
+
+    try {
+      if (navigator.clipboard && window.ClipboardItem && qrCanvas) {
+        const padding = 64;
+        const shareCanvas = document.createElement('canvas');
+        const context = shareCanvas.getContext('2d');
+        if (!context) throw new Error('Canvas is unavailable.');
+
+        const width = 1280;
+        const qrSize = 1024;
+        const lineHeight = 38;
+        const urlFont = '25px Arial';
+        const maxTextWidth = width - padding * 2;
+        context.font = urlFont;
+        const urlLines: string[] = [];
+        let line = '';
+        for (const character of registrationUrl) {
+          const nextLine = line + character;
+          if (context.measureText(nextLine).width > maxTextWidth && line) {
+            urlLines.push(line);
+            line = character;
+          } else {
+            line = nextLine;
+          }
+        }
+        if (line) urlLines.push(line);
+
+        const titleHeight = 52;
+        const labelHeight = 38;
+        const height = padding * 2 + titleHeight + qrSize + labelHeight + urlLines.length * lineHeight;
+        shareCanvas.width = width;
+        shareCanvas.height = height;
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, width, height);
+        context.fillStyle = '#173f3b';
+        context.font = '700 32px Arial';
+        context.fillText(`${selectedEvent.name} registration`, padding, padding + 34);
+        context.drawImage(qrCanvas, padding + (width - padding * 2 - qrSize) / 2, padding + titleHeight, qrSize, qrSize);
+        context.font = '700 24px Arial';
+        context.fillText('Registration link', padding, padding + titleHeight + qrSize + 30);
+        context.fillStyle = '#263b3d';
+        context.font = urlFont;
+        urlLines.forEach((urlLine, index) => {
+          context.fillText(urlLine, padding, padding + titleHeight + qrSize + labelHeight + (index + 1) * lineHeight - 8);
+        });
+
+        const imageBlob = await new Promise<Blob>((resolve, reject) => {
+          shareCanvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Could not create the share image.')), 'image/png');
+        });
+        const imageDataUrl = shareCanvas.toDataURL('image/png');
+        const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[character] ?? character);
+        const safeUrl = escapeHtml(registrationUrl);
+        const safeEventName = escapeHtml(selectedEvent.name);
+        const html = `<div><p><a href="${safeUrl}">Register here: ${safeUrl}</a></p><img src="${imageDataUrl}" alt="${safeEventName} QR code and registration link" width="640"></div>`;
+
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': new Blob([registrationUrl], { type: 'text/plain' }),
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'image/png': imageBlob,
+          }),
+        ]);
+        setNotice('Registration link and high-resolution QR copied.');
+        return;
+      }
+
+      await navigator.clipboard.writeText(registrationUrl);
+      setNotice('Registration link copied. QR image copying is not supported by this browser.');
+    } catch {
+      try {
+        await navigator.clipboard.writeText(registrationUrl);
+        setNotice('Registration link copied. QR image copying is not supported by this browser.');
+      } catch {
+        setNotice('Clipboard access is unavailable on this browser.');
+      }
+    }
+  }
+
+  if (checkingSession) return <main className="screen-loading"><Sparkles size={22} /> Loading EventPilot</main>;
+
+  if (!authenticated) {
+    return (
+      <main className="auth-screen">
+        <section className="auth-aside">
+          <a className="brand-lockup" href="/" aria-label="EventPilot home"><span className="brand-symbol"><Sparkles size={20} /></span><span><strong>eventpilot</strong><small>EVENT OPERATIONS</small></span></a>
+          <div className="auth-message"><span className="eyebrow eyebrow-light">ADMIN WORKSPACE</span><h1>Bring your next event to life.</h1><p>Create a focused registration experience for your people, with one link to share wherever they are.</p><div className="auth-feature"><span><QrCode size={18} /></span><div><strong>One link, ready to share</strong><small>Every event gets its own registration page and QR.</small></div></div></div>
+          <span className="auth-footer">EVENTPILOT · PRIVATE EVENT ACCESS</span>
+        </section>
+        <section className="auth-main"><div className="auth-form-wrap"><span className="mobile-brand"><span className="brand-symbol"><Sparkles size={19} /></span> eventpilot</span><span className="eyebrow">WELCOME BACK</span><h2>Admin sign in</h2><p className="auth-intro">Use the administrator credentials configured for this deployment.</p>
+          <form className="form-stack" onSubmit={handleLogin}>
+            <label>Email address<input required type="email" autoComplete="username" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} placeholder="admin@yourcompany.com" /></label>
+            <label>Password<input required type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" /></label>
+            {loginError && <p className="form-error" role="alert">{loginError}</p>}
+            <button className="button button-primary button-wide" type="submit">Sign in <ChevronRight size={17} /></button>
+          </form>
+          <div className="secure-note"><ShieldCheck size={16} /><span>Admin access is verified securely by the server.</span></div>
+        </div></section>
+      </main>
+    );
+  }
+
+  return (
+    <div className="workspace-shell">
+      <aside className="sidebar">
+        <a className="brand-lockup" href="/" aria-label="EventPilot home"><span className="brand-symbol"><Sparkles size={19} /></span><span><strong>eventpilot</strong><small>EVENT OPERATIONS</small></span></a>
+        <div className="workspace-switch"><span className="workspace-avatar">{adminEmail.slice(0, 1).toUpperCase()}</span><span className="workspace-copy"><strong>Admin workspace</strong><small>{adminEmail}</small></span><ShieldCheck size={17} /></div>
+        <div className="side-label">WORKSPACE</div>
+        <button className="nav-item active"><CalendarDays size={18} /><span>Events</span><span className="nav-count">{events.length}</span></button>
+        <div className="side-label event-list-label">YOUR EVENTS<button className="tiny-icon" onClick={() => { setShowForm(true); setFormError(''); }} aria-label="Create event"><Plus size={15} /></button></div>
+        <div className="event-shortcuts">{events.map((event) => <button key={event.id} onClick={() => { setSelectedId(event.id); setShowForm(false); }} className={`event-shortcut ${selectedId === event.id ? 'event-current' : ''}`}><span className="event-dot" /><span>{event.name}</span></button>)}</div>
+        <div className="sidebar-bottom"><div className="help-card"><span className="help-icon"><QrCode size={18} /></span><strong>Registration, simplified</strong><p>Share one event link or let guests scan the QR to request access.</p></div><button className="profile-row" onClick={handleLogout}><span className="profile-avatar">{adminEmail.slice(0, 1).toUpperCase()}</span><span className="profile-copy"><strong>{adminEmail}</strong><small>Administrator</small></span><LogOut size={17} /></button></div>
+      </aside>
+
+      <main className="main-area">
+        <header className="topbar"><div className="topbar-left"><span className="breadcrumb-muted">Admin workspace</span><ChevronRight size={15} /><span className="breadcrumb-current">Events</span></div><div className="topbar-right"><span className="admin-status"><i /> Admin access</span><button className="logout-button" onClick={handleLogout}><LogOut size={16} /><span>Sign out</span></button></div></header>
+        <div className="content-wrap">
+          {showForm ? (
+            <>
+              <div className="page-heading"><div><div className="eyebrow">EVENT SETUP</div><h1>Create an event</h1><p>Add the details guests need. We’ll make a registration page and QR link for you.</p></div></div>
+              <form className="event-form panel" onSubmit={handleCreateEvent}>
+                <div className="form-section-title"><span className="section-icon"><CalendarDays size={18} /></span><div><h2>Event details</h2><p>Start with the essentials. You can share your link as soon as the event is created.</p></div></div>
+                <div className="event-fields"><label className="field-span">Event name<input required minLength={2} maxLength={120} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="e.g. Annual Leadership Summit" /></label><label>Event date<input required type="date" min={new Date().toISOString().slice(0, 10)} value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} /></label><label>Start time<input type="time" value={draft.startTime} onChange={(event) => setDraft({ ...draft, startTime: event.target.value })} /></label><label className="field-span">Venue<input required maxLength={180} value={draft.venue} onChange={(event) => setDraft({ ...draft, venue: event.target.value })} placeholder="Office, venue, or online location" /></label><label className="field-span">Event details<textarea rows={4} maxLength={1200} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Share a few details about what guests can expect." /></label></div>
+                {formError && <p className="form-error" role="alert">{formError}</p>}
+                <div className="form-actions"><button className="button button-quiet" type="button" onClick={() => { setShowForm(false); setFormError(''); }}>Cancel</button><button className="button button-primary" type="submit"><Plus size={17} /> Create event & registration link</button></div>
+              </form>
+            </>
+          ) : (
+            <>
+              <div className="page-heading"><div><div className="eyebrow">ADMIN WORKSPACE <span className="eyebrow-separator">/</span> EVENTS</div><h1>Your events</h1><p>Create an event, then share its registration link or QR with participants.</p></div><button className="button button-primary" onClick={() => { setShowForm(true); setFormError(''); }}><Plus size={17} /> Create event</button></div>
+              {events.length === 0 ? (
+                <section className="empty-workspace"><div className="empty-icon"><CalendarDays size={25} /></div><span className="eyebrow">A FRESH START</span><h2>Your event starts here.</h2><p>Create your first event to generate a participant registration page and shareable QR code.</p><button className="button button-primary" onClick={() => setShowForm(true)}><Plus size={17} /> Create your first event</button></section>
+              ) : (
+                <div className="event-workspace-grid">
+                  <section className="event-list-panel"><div className="list-heading"><div><h2>Events</h2><p>{events.length} {events.length === 1 ? 'event' : 'events'} in this browser</p></div><span className="list-count">{events.length}</span></div><div className="event-list">{events.map((event) => <button key={event.id} className={`event-list-item ${event.id === selectedId ? 'selected' : ''}`} onClick={() => setSelectedId(event.id)}><span className="event-list-icon"><CalendarDays size={18} /></span><span className="event-list-copy"><strong>{event.name}</strong><small>{new Date(`${event.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {event.venue}</small></span><ChevronRight size={16} /></button>)}</div></section>
+                  {selectedEvent && <section className="event-details-panel"><div className="detail-topline"><span className="event-label"><i /> UPCOMING EVENT</span><button className="button button-quiet button-small" onClick={() => window.open(selectedEvent.registrationUrl, '_blank', 'noopener,noreferrer')}><ExternalLink size={15} /> Preview page</button></div><h2>{selectedEvent.name}</h2><p className="event-description">{selectedEvent.description || 'An event by invitation. Verify your work email to view the event details.'}</p><div className="event-meta"><span><CalendarDays size={17} /><strong>{new Date(`${selectedEvent.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}{selectedEvent.startTime ? ` · ${selectedEvent.startTime}` : ''}</strong></span><span><MapPin size={17} /><strong>{selectedEvent.venue}</strong></span></div><div className="share-section"><div className="share-heading"><div><span className="eyebrow">PARTICIPANT ACCESS</span><h3>Share registration</h3></div><span className="share-lock"><ShieldCheck size={16} /> @sc.com only</span></div><div className="share-link-row"><span className="link-icon"><Ticket size={17} /></span><span className="share-link-text">{selectedEvent.registrationUrl}</span><button className="icon-action" onClick={copyLink} aria-label="Copy registration link" title="Copy registration link">{copying ? <Check size={17} /> : <Copy size={17} />}</button></div><div className="qr-share-row"><div className="qr-frame"><QRCodeCanvas value={selectedEvent.registrationUrl} size={108} bgColor="#ffffff" fgColor="#173f3b" includeMargin /></div><div className="qr-copy"><strong>Scan to request access</strong><p>Participants enter their name and work email. Approved guests can view the event details.</p><button className="button button-quiet button-small" onClick={copyShareDetails}><Copy size={15} /> Copy link + QR</button></div></div></div><div className="eligibility-note"><Users size={17} /><span>Only addresses ending with @sc.com can access the event.</span></div></section>}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <footer className="app-footer"><span>© 2026 EventPilot</span><span><ShieldCheck size={14} /> Private event access</span></footer>
+      </main>
+      {selectedEvent && <div className="qr-export-source" aria-hidden="true" style={{ position: 'fixed', left: '-2000px', top: 0, width: 0, height: 0, overflow: 'hidden', visibility: 'hidden' }}><QRCodeCanvas value={selectedEvent.registrationUrl} size={1024} bgColor="#ffffff" fgColor="#173f3b" includeMargin /></div>}
+      {notice && <div className="toast" role="status"><Check size={17} /><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss">×</button></div>}
+    </div>
+  );
 }
-function Stat({icon,label,value,trend,note,color}:{icon:React.ReactNode;label:string;value:string;trend?:string;note:string;color:string}){return <div className="stat-card"><div className={`stat-icon ${color}`}>{icon}</div><div className="stat-label">{label}</div><div className="stat-value-row"><strong>{value}</strong>{trend&&<span className={`stat-trend ${color==='green'?'trend-green':''}`}>{color==='green'?<ArrowUpRight size={13}/>:<ArrowUpRight size={13}/>} {trend}</span>}</div><div className="stat-note">{note}</div></div>}
-function Avatar({name}:{name:string}){return <div className="attendee-avatar" style={{background:colors[name.length%colors.length]}}>{initials(name)}</div>}
-function AttendeeTable({attendees,onSelect,onCheckIn,compact=false}:{attendees:Attendee[];onSelect:(a:Attendee)=>void;onCheckIn?:(a:Attendee)=>void;compact?:boolean}){return <div className="table-scroll"><table className="attendee-table"><thead><tr><th>ATTENDEE</th><th>COMPANY</th><th>TICKET</th><th>STATUS</th>{!compact&&<th>CHECK-IN</th>}<th/></tr></thead><tbody>{attendees.map(a=><tr key={a.id}><td><button className="attendee-cell" onClick={()=>onSelect(a)}><Avatar name={a.name}/><span><strong>{a.name}</strong><small>{a.email}</small></span></button></td><td className="company-cell">{a.company}</td><td><span className={`ticket-tag ticket-${a.ticket.toLowerCase()}`}>{a.ticket}</span></td><td><span className={`status-pill ${a.status==='Checked in'?'status-checked':'status-registered'}`}><span/>{a.status}</span></td>{!compact&&<td className="time-cell">{a.checkedInAt||'—'}</td>}<td><div className="row-actions">{onCheckIn&&a.status!=='Checked in'&&<button className="mini-checkin" onClick={()=>onCheckIn(a)} title="Check in"><Check size={15}/></button>}<button className="icon-button row-more" onClick={()=>onSelect(a)} title="View badge"><MoreHorizontal size={17}/></button></div></td></tr>)}</tbody></table>{attendees.length===0&&<div className="empty-state"><Users size={26}/><strong>No attendees found</strong><span>Try a different search or add a new attendee.</span></div>}</div>}
-function QuickAction({icon,title,desc,onClick}:{icon:React.ReactNode;title:string;desc:string;onClick:()=>void}){return <button className="quick-action" onClick={onClick}><div className="quick-icon">{icon}</div><div><strong>{title}</strong><span>{desc}</span></div><ChevronRight size={16}/></button>}

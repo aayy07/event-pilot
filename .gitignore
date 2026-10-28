@@ -2,7 +2,9 @@ node_modules/
 .next/
 out/
 .env
+.env.local
 .venv/
+.vercel/
 __pycache__/
 *.py[cod]
 .DS_Store
